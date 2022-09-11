@@ -1,5 +1,8 @@
 package com.xiaobai.redislock.controller;
 
+import org.redisson.Redisson;
+import org.redisson.api.RLock;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,15 +22,19 @@ import java.util.concurrent.TimeUnit;
 public class IndexController {
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    private Redisson redisson;
     @RequestMapping("/deduct_stock")
     public String deductStock(){
         String lockKey = "product_001";
-        String clientId = UUID.randomUUID().toString();
+/*        String clientId = UUID.randomUUID().toString();
         // 加锁
         Boolean result = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, clientId, 10, TimeUnit.SECONDS);
         if(!result){
             return "error";
-        }
+        }*/
+        RLock redissonLock = redisson.getLock(lockKey);
+        redissonLock.lock();
         try{
             int stock = Integer.parseInt(stringRedisTemplate.opsForValue().get("stock"));
             if(stock>0){
@@ -40,10 +47,11 @@ public class IndexController {
         }catch (Exception e) {
             e.printStackTrace();
         }finally {
-            if(clientId.equals(stringRedisTemplate.opsForValue().get(lockKey))){
+            redissonLock.unlock();
+/*            if(clientId.equals(stringRedisTemplate.opsForValue().get(lockKey))){
                 // 释放锁
                 stringRedisTemplate.delete(lockKey);
-            }
+            }*/
         }
         return "end";
     }
