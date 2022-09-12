@@ -4,10 +4,7 @@ import com.xiaobai.redismulticache.pojo.Product;
 import com.xiaobai.redismulticache.pojo.Result;
 import com.xiaobai.redismulticache.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * className: ProductController
@@ -25,5 +22,15 @@ public class ProductController {
     public Result get(@PathVariable("productId") int productId){
         Product product = productService.getById(productId);
         return new Result<Product>(200,product);
+    }
+    @PostMapping
+    public Result create(@RequestBody Product product){
+        product= productService.create(product);
+        return new Result(200,product);
+    }
+    @PostMapping("/update")
+    public Result update(@RequestBody Product product){
+        product= productService.update(product);
+        return new Result(200,product);
     }
 }

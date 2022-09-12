@@ -2,6 +2,7 @@ package com.xiaobai.redismulticache.service.impl;
 
 import com.alibaba.druid.support.json.JSONUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xiaobai.redismulticache.common.JSONUtil;
 import com.xiaobai.redismulticache.common.RedisUtil;
 import com.xiaobai.redismulticache.mapper.ProductMapper;
 import com.xiaobai.redismulticache.pojo.Product;
@@ -36,7 +37,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     private Redisson redisson;
 
     @Override
-    public Product get(Integer id) {
+    public Product get(Integer id) throws InterruptedException {
         String productCacheKey=PRODUCT_PREFIX+id;
         Product product = null;
         product= getProductFromCache(productCacheKey);
@@ -45,7 +46,13 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         }
 //        解决缓存击穿问题，通过分布式锁，进行热点数据重建，
         RLock hotKeyLock = redisson.getLock(PRODUCT_HOT_KEY_CREATE_PREFIX + id);
-        hotKeyLock.lock();
+//        hotKeyLock.lock();
+//        假如2万的并发，一个线程会阻塞其他所有的线程来重建缓存，缓存构建完后，后面的19999的线程依旧会进行加锁，取缓存，解锁。
+//        但是这个时候缓存已经重建了，不需要再加锁了。所以我们选择了tryLock，这个方法会在一定时间内尝试加锁，超过时间后就不会再加锁了，就会直接执行后面的代码
+//        加不了锁的就正好符合我们的期望，因为我们是不希望后面的19999个线程来加锁的
+//        经过如此的优化，超过加锁时间的其他线程，就会并发去执行
+//        但是这个优化需要建立在第一个线程能在规定的时间内成功构建了缓存，否则过了这个时间，其他线程就不会再去等待锁，直接去查缓存，但是缓存还没有构建好，就会出现缓存击穿的问题
+        hotKeyLock.tryLock(2,TimeUnit.SECONDS);
         try{
             product=getProductFromCache(productCacheKey);
             if (product!=null){
@@ -58,7 +65,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
             try {
                 product=productMapper.selectById(id);
                 if(product!=null){
-                    RedisUtil.set(productCacheKey, JSONUtils.toJSONString(product),getProductCacheTimeout(), TimeUnit.SECONDS);
+                    RedisUtil.set(productCacheKey, JSONUtil.toJSONString(product),getProductCacheTimeout(), TimeUnit.SECONDS);
                 }else {
 //                    防止缓存穿透，将空对象放入缓存
                     RedisUtil.set(productCacheKey,EMPRY_CACHE,getEmptyCacheTimeout(),TimeUnit.SECONDS);
@@ -86,7 +93,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
                 return new Product();
             }
             //可以有效的对于热点数据进行延期，防止缓存过期
-            product= (Product) JSONUtils.parse(productStr);
+            product=  JSONUtil.parseObject(productStr,Product.class);
             RedisUtil.set(productCacheKey,productStr,getProductCacheTimeout(),TimeUnit.SECONDS);
         }
         return product;
@@ -95,7 +102,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
     @Override
     public Product create(Product product) {
         productMapper.insert(product);
-        RedisUtil.set(PRODUCT_PREFIX + product.getId(), JSONUtils.toJSONString(product), getProductCacheTimeout(), TimeUnit.SECONDS);
+        RedisUtil.set(PRODUCT_PREFIX + product.getId(), JSONUtil.toJSONString(product), getProductCacheTimeout(), TimeUnit.SECONDS);
         return product;
     }
 
@@ -113,7 +120,7 @@ public class ProductServiceImpl extends ServiceImpl<ProductMapper, Product> impl
         writeLock.lock();
         try {
             productMapper.updateById(product);
-            RedisUtil.set(PRODUCT_PREFIX + product.getId(), JSONUtils.toJSONString(product), getProductCacheTimeout(), TimeUnit.SECONDS);
+            RedisUtil.set(PRODUCT_PREFIX + product.getId(), JSONUtil.toJSONString(product), getProductCacheTimeout(), TimeUnit.SECONDS);
         } finally {
             writeLock.unlock();
         }
