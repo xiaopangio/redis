@@ -1,4 +1,4 @@
-package com.xiaobai.redislock.config;
+package com.xiaobai.redismulticache.config;
 
 import org.redisson.Redisson;
 import org.redisson.config.Config;
@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
  * className: RedissonConfig
  * description:
  * author: xiaopangio
- * date: 2022/9/11 17:20
+ * date: 2022/9/12 15:58
  * version: 1.0
  */
 @Configuration

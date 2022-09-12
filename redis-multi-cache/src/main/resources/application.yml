@@ -1,0 +1,19 @@
+spring:
+  redis:
+    host: 192.168.229.129
+    port: 6379
+    password: root
+    database: 0
+    timeout: 10000
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1ms
+        max-idle: 8
+        min-idle: 0
+  datasource:
+    druid:
+      url: jdbc:mysql://localhost:3306/redis_test?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=UTC
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      username: root
+      password: root
